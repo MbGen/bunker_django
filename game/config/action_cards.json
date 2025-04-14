@@ -1,0 +1,98 @@
+{
+  "action_cards": [
+    {
+      "id": 1,
+      "name": "Раскрытие информации",
+      "description": "Узнайте один скрытый атрибут любого игрока",
+      "effect_type": "reveal_attribute",
+      "effect_data": {
+        "target_required": true,
+        "attribute_required": true
+      }
+    },
+    {
+      "id": 2,
+      "name": "Обмен атрибутами",
+      "description": "Обменяйте один из своих атрибутов с атрибутом другого игрока",
+      "effect_type": "swap_attribute",
+      "effect_data": {
+        "target_required": true,
+        "attribute_required": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Изменение атрибута",
+      "description": "Измените один из атрибутов любого игрока на новое значение",
+      "effect_type": "change_attribute",
+      "effect_data": {
+        "target_required": true,
+        "attribute_required": true,
+        "new_value_required": true
+      }
+    },
+    {
+      "id": 4,
+      "name": "Дополнительный голос",
+      "description": "Ваш голос считается за два в текущем раунде голосования",
+      "effect_type": "extra_vote",
+      "effect_data": {
+        "duration": 1
+      }
+    },
+    {
+      "id": 5,
+      "name": "Иммунитет",
+      "description": "Вы не можете быть исключены в текущем раунде",
+      "effect_type": "immunity",
+      "effect_data": {
+        "duration": 1
+      }
+    },
+    {
+      "id": 6,
+      "name": "Вето",
+      "description": "Отмените результаты текущего голосования",
+      "effect_type": "veto",
+      "effect_data": {}
+    },
+    {
+      "id": 7,
+      "name": "Увеличение бункера",
+      "description": "Увеличьте вместимость бункера на 1 человека",
+      "effect_type": "add_bunker_capacity",
+      "effect_data": {
+        "value": 1
+      }
+    },
+    {
+      "id": 8,
+      "name": "Сокращение запасов",
+      "description": "Уменьшите запасы бункера на 20%",
+      "effect_type": "reduce_supplies",
+      "effect_data": {
+        "percentage": 20
+      }
+    },
+    {
+      "id": 9,
+      "name": "Увеличение запасов",
+      "description": "Увеличьте запасы бункера на 20%",
+      "effect_type": "increase_supplies",
+      "effect_data": {
+        "percentage": 20
+      }
+    },
+    {
+      "id": 10,
+      "name": "Блокировка атрибута",
+      "description": "Заблокируйте один атрибут любого игрока, чтобы он не мог его раскрыть",
+      "effect_type": "block_attribute",
+      "effect_data": {
+        "target_required": true,
+        "attribute_required": true,
+        "duration": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+DJANGO_SETTINGS_MODULE=bunker_project.settings daphne bunker_project.asgi:application -p 8000

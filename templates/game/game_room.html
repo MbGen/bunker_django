@@ -1,0 +1,1266 @@
+{% extends 'game/base.html' %}
+{% load custom_filters %}
+{% block title %}Бункер - Игровая комната{% endblock %}
+
+{% block extra_css %}
+<style>
+    .player-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .player-status-ready {
+        color: #28a745;
+    }
+    .player-status-waiting {
+        color: #ffc107;
+    }
+    .player-status-playing {
+        color: #007bff;
+    }
+    .player-status-eliminated {
+        color: #dc3545;
+    }
+    .player-status-survived {
+        color: #28a745;
+    }
+    .current-player-indicator {
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 0.5; }
+        50% { opacity: 1; }
+        100% { opacity: 0.5; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">Комната: {{ room.name }}</h2>
+                <div>
+                    <span class="badge bg-{% if room.status == 'waiting' %}warning{% elif room.status == 'in_progress' %}primary{% else %}success{% endif %}">
+                        {% if room.status == 'waiting' %}Ожидание{% elif room.status == 'in_progress' %}Игра идет{% else %}Завершена{% endif %}
+                    </span>
+                    <span class="badge bg-info ms-2">ID: {{ room.room_id }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if room.status == 'waiting' %}
+<!-- Режим ожидания -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Игроки ({{ players|length }}/{{ room.max_players }})</h3>
+            </div>
+            <div class="card-body player-list">
+                <div class="row">
+                    {% for p in players %}
+                    <div class="col-md-6 mb-3">
+                        <div class="player-card {% if p.status == 'ready' %}border-success{% endif %}" data-player-user="{{ p.user.id }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">{{ p.user.username }}</h5>
+                                <span class="player-status-{{ p.status }}">
+                                    {% if p.status == 'ready' %}
+                                    <i class="fas fa-check-circle"></i> Готов
+                                    {% else %}
+                                    <i class="fas fa-clock"></i> Ожидание
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if p.user == request.user %}
+                            <div class="mt-3 text-center">
+                                {% if p.status == 'ready' %}
+                                <button class="btn btn-sm btn-warning set-ready-btn" data-player-id="{{ p.id }}" data-ready="false">
+                                    <i class="fas fa-times-circle"></i> Отменить готовность
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-success set-ready-btn" data-player-id="{{ p.id }}" data-ready="true">
+                                    <i class="fas fa-check-circle"></i> Готов к игре
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% elif is_creator %}
+                            <div class="mt-3 text-center">
+                                <button class="btn btn-sm btn-danger kick-player-btn" data-player-id="{{ p.id }}">
+                                    <i class="fas fa-user-times"></i> Исключить
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if is_creator %}
+            <div class="card-footer text-center">
+                <button id="start-game-btn" class="btn btn-primary btn-lg" {% if players|length < 0 %}disabled{% endif %}> <!--TODO: CHANGE TO 6-->>
+                    <i class="fas fa-play"></i> Начать игру
+                </button>
+                <div class="form-text mt-2">
+                    {% if players|length < 6 %}
+                    Для начала игры необходимо минимум 6 игроков.
+                    {% else %}
+                    Убедитесь, что все игроки готовы перед началом игры.
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Чат</h3>
+            </div>
+            <div class="card-body">
+                <div class="chat-container" id="chat-container">
+                    {% for message in chat_messages %}
+                    <div class="chat-message {% if message.user == request.user %}chat-message-own{% else %}chat-message-other{% endif %}">
+                        <span class="chat-username">{{ message.user.username }}:</span>
+                        <span class="chat-content">{{ message.message }}</span>
+                        <div class="chat-timestamp">{{ message.timestamp|date:"H:i:s" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-3">
+                    <div class="input-group">
+                        <input type="text" id="chat-input" class="form-control" placeholder="Введите сообщение...">
+                        <button id="chat-send-btn" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">Информация</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>Создатель:</strong> {{ room.creator.username }}</p>
+                <p><strong>Максимум игроков:</strong> {{ room.max_players }}</p>
+                <p><strong>Создана:</strong> {{ room.created_at|date:"d.m.Y H:i" }}</p>
+                <div class="alert alert-info">
+                    <p class="mb-0">Поделитесь ID комнаты ({{ room.room_id }}) с друзьями, чтобы они могли присоединиться.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Режим игры -->
+<div class="row">
+    <div class="col-md-8">
+        <!-- Информация о катастрофе и бункере -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Катастрофа и бункер</h3>
+            </div>
+            <div class="card-body">
+                <div class="catastrophe-info mb-3">
+                    <h4>{{ game_data.catastrophe.name }}</h4>
+                    <p>{{ game_data.catastrophe.description }}</p>
+                    <p><strong>Причина:</strong> {{ game_data.catastrophe.cause }}</p>
+                    <p><strong>Продолжительность:</strong> {{ game_data.catastrophe.duration_months }} месяцев</p>
+                </div>
+                
+                <div class="bunker-info">
+                    <h4>Информация о бункере</h4>
+                    <p><strong>Размер:</strong> {{ game_data.bunker_info.size }}</p>
+                    <p><strong>Запасы:</strong> {{ game_data.bunker_info.supplies }}</p>
+                    <p><strong>Вместимость:</strong> {{ game_data.bunker_info.capacity }} человек</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Игровой процесс -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">Игровой процесс</h3>
+                <div>
+                    <span class="badge bg-primary">Раунд {{ game_data.session.current_round }}</span>
+                    <span class="badge bg-info ms-2">
+                        Направление: {% if game_data.session.clockwise %}По часовой{% else %}Против часовой{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if game_data.current_player %}
+                <div class="alert alert-primary">
+                    <h5>Сейчас ходит: {{ game_data.current_player.user.username }}</h5>
+                    {% if game_data.is_my_turn %}
+                    <p>Это ваш ход! Выберите один из своих атрибутов, чтобы раскрыть его другим игрокам.</p>
+                    {% else %}
+                    <p>Дождитесь, пока игрок раскроет один из своих атрибутов.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <div class="game-events mb-4">
+                    <h5>События игры</h5>
+                    {% for event in game_data.events %}
+                    <div class="event-item">
+                        {% if event.type == 'game_start' %}
+                        <strong>Игра началась!</strong> Катастрофа: {{ event.data.catastrophe }}
+                        {% elif event.type == 'reveal' %}
+                        <strong>{{ event.player.user.username }}</strong> раскрыл атрибут <strong>{{ event.data.attribute }}</strong>: {{ event.data.value }}
+                        {% elif event.type == 'vote' %}
+                        <strong>{{ event.player.user.username }}</strong> проголосовал против <strong>{{ event.target_player.user.username }}</strong>
+                        {% elif event.type == 'elimination' %}
+                        <strong>{{ event.player.user.username }}</strong> был исключен из бункера ({{ event.data.votes }} голосов)
+                        {% elif event.type == 'action_card' %}
+                        <strong>{{ event.player.user.username }}</strong> использовал карту <strong>{{ event.data.card_name }}</strong>
+                        {% elif event.type == 'game_end' %}
+                        <strong>Игра завершена!</strong> {{ event.data.result }}
+                        {% endif %}
+                        <div class="event-timestamp">{{ event.timestamp|date:"H:i:s" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Игроки</h5>
+                        <div class="player-list">
+                            {% for p in players %}
+                            <div class="player-card mb-2 {% if p.status == 'eliminated' %}eliminated{% elif p == game_data.current_player %}active{% endif %}" data-player-user="{{ p.user.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        {{ p.user.username }}
+                                        {% if p == game_data.current_player %}
+                                        <i class="fas fa-arrow-right text-primary current-player-indicator"></i>
+                                        {% endif %}
+                                    </h5>
+                                    <span class="player-status-{{ p.status }}">
+                                        {% if p.status == 'playing' %}
+                                        <i class="fas fa-user"></i> Играет
+                                        {% elif p.status == 'eliminated' %}
+                                        <i class="fas fa-user-slash"></i> Исключен
+                                        {% elif p.status == 'survived' %}
+                                        <i class="fas fa-user-check"></i> Выжил
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                
+                                {% if p.status != 'eliminated' %}
+                                    <div class="mt-2">
+                                        <h6>Открытые атрибуты:</h6>
+                                        {% with player_attrs=game_data.revealed_attributes|get_item:p.id %}
+                                            {% if player_attrs %}
+                                                {% for attr, value in player_attrs.items %}
+                                                <li class="attribute-item">
+                                                    <strong>{{ attr|title }}:</strong> {{ value }}
+                                                </li>
+                                                {% endfor %}
+                                            {% else %}
+                                            <p class="text-muted">Нет открытых атрибутов</p>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                {% endif %}
+                                
+                                {% if game_data.session.current_round and p != player and p.status == 'playing' %}
+                                <div class="mt-2 text-center">
+                                    <button class="btn btn-sm btn-danger vote-btn" data-session-id="{{ game_data.session.id }}" data-voter-id="{{ player.id }}" data-target-id="{{ p.id }}">
+                                        <i class="fas fa-thumbs-down"></i> Голосовать против
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        {% if game_data.is_my_turn and player.status == 'playing' %}
+                        <h5>Выберите атрибут для раскрытия</h5>
+                        <div class="list-group mb-4">
+                            {% for attr, value in game_data.character_attributes.items %}
+                            {% if attr not in player.revealed_attributes %}
+                            <button class="list-group-item list-group-item-action reveal-attribute-btn" data-player-id="{{ player.id }}" data-attribute="{{ attr }}">
+                                <strong>{{ attr|title }}:</strong> {{ value }}
+                            </button>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="text-center mb-4">
+                            <button class="btn btn-warning next-player-btn" data-session-id="{{ game_data.session.id }}">
+                                <i class="fas fa-forward"></i> Следующий игрок
+                            </button>
+                        </div>
+                        {% endif %}
+                        
+                        <h5>Ваши карты действий</h5>
+                        <div class="action-cards">
+                            {% for card in game_data.action_cards %}
+                            <div class="action-card {% if card.used %}used{% endif %}" data-card-id="{{ card.id }}">
+                                <h6>{{ card.card.name }}</h6>
+                                <p>{{ card.card.description }}</p>
+                                {% if not card.used %}
+                                <button class="btn btn-sm btn-primary use-card-btn" data-card-id="{{ card.id }}" data-player-id="{{ player.id }}" data-effect-type="{{ card.card.effect_type }}">
+                                    <i class="fas fa-magic"></i> Использовать
+                                </button>
+                                {% else %}
+                                <span class="badge bg-secondary">Использована</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Ваш персонаж -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Ваш персонаж</h3>
+            </div>
+            <div class="card-body">
+                <ul class="attribute-list">
+                    {% for attr, value in game_data.character_attributes.items %}
+                    <li class="attribute-item {% if attr not in player.revealed_attributes %}attribute-hidden{% endif %}">
+                        <strong>{{ attr|title }}:</strong> {{ value }}
+                        {% if attr in player.revealed_attributes %}
+                        <span class="badge bg-success ms-2">Открыто</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Чат -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Чат</h3>
+            </div>
+            <div class="card-body">
+                <div class="chat-container" id="chat-container">
+                    {% for message in chat_messages %}
+                    <div class="chat-message {% if message.user == request.user %}chat-message-own{% else %}chat-message-other{% endif %}">
+                        <span class="chat-username">{{ message.user.username }}:</span>
+                        <span class="chat-content">{{ message.message }}</span>
+                        <div class="chat-timestamp">{{ message.timestamp|date:"H:i:s" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-3">
+                    <div class="input-group">
+                        <input type="text" id="chat-input" class="form-control" placeholder="Введите сообщение...">
+                        <button id="chat-send-btn" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Модальные окна -->
+<div class="modal fade" id="useCardModal" tabindex="-1" aria-labelledby="useCardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="useCardModalLabel">Использовать карту</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="useCardForm">
+                    <input type="hidden" id="card_id" name="card_id">
+                    <input type="hidden" id="player_id" name="player_id">
+                    
+                    <div class="mb-3" id="targetPlayerContainer">
+                        <label for="target_id" class="form-label">Выберите цель</label>
+                        <select class="form-select" id="target_id" name="target_id">
+                            {% for p in players %}
+                            {% if p.status == 'playing' and p != player %}
+                            <option value="{{ p.id }}">{{ p.user.username }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="attributeContainer" style="display: none;">
+                        <label for="attribute" class="form-label">Выберите атрибут</label>
+                        <select class="form-select" id="attribute" name="attribute">
+                            <option value="age">Возраст</option>
+                            <option value="gender">Пол</option>
+                            <option value="child_free">Child free</option>
+                            <option value="profession">Профессия</option>
+                            <option value="health">Здоровье</option>
+                            <option value="baggage">Багаж</option>
+                            <option value="phobia">Фобия</option>
+                            <option value="fact1">Факт 1</option>
+                            <option value="fact2">Факт 2</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3" id="newValueContainer" style="display: none;">
+                        <label for="new_value" class="form-label">Новое значение</label>
+                        <input type="text" class="form-control" id="new_value" name="new_value">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmUseCard">Использовать</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // WebSocket соединение
+    let socket;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Инициализация WebSocket
+        initWebSocket();
+        
+        // Прокрутка чата вниз
+        scrollChatToBottom();
+        
+        // Обработчики событий
+        setupEventHandlers();
+    });
+    
+    function initWebSocket() {
+        // Создаем WebSocket соединение
+        const roomId = '{{ room.room_id }}';
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws/game/${roomId}/`;
+        
+        socket = new WebSocket(wsUrl);
+        
+        socket.onopen = function(e) {
+            console.log('WebSocket соединение установлено');
+        };
+        
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            handleWebSocketMessage(data);
+        };
+        
+        socket.onclose = function(e) {
+            console.log('WebSocket соединение закрыто');
+            // Пытаемся переподключиться через 5 секунд
+            setTimeout(function() {
+                initWebSocket();
+            }, 5000);
+        };
+        
+        socket.onerror = function(e) {
+            console.error('WebSocket ошибка:', e);
+        };
+    }
+    
+    function handleWebSocketMessage(data) {
+        switch(data.type) {
+            case 'user_connect':
+                showAlert(`Игрок ${data.username} подключился к комнате`, 'info');
+                // HACK поки просто через сокети i html оновлюю
+                // addPlayerToList(data.username, data.user_id, `{% if is_creator %}true{% else %}false{% endif %}` === "true");
+                setTimeout(() => {
+                    addPlayerToList(
+                        data.username,
+                        data.user_id,
+                        `{% if is_creator %}true{% else %}false{% endif %}` === "true"
+                    );
+                }, 2000); // задержка в миллисекундах (1000 = 1 секунда)
+                break;
+            case 'user_disconnect':
+                showAlert(`Игрок ${data.username} отключился от комнаты`, 'info');
+                break;
+            case 'chat_message':
+                addChatMessage(data);
+                break;
+            case 'player_status':
+                updatePlayerStatus(data);
+                break;
+            case 'attribute_revealed':
+                handleAttributeRevealed(data);
+                break;
+            case 'vote_cast':
+                handleVoteCast(data);
+                break;
+            case 'player_eliminated':
+                handlePlayerEliminated(data);
+                break;
+            case 'new_round':
+                handleNewRound(data);
+                break;
+            case 'card_used':
+                handleCardUsed(data);
+                break;
+            case 'next_player':
+                handleNextPlayer(data);
+                break;
+            case 'room_status':
+                handleRoomStatus(data);
+                break
+        }
+    }
+
+    function addPlayerToList(username, playerId, isRoomCreator = false) {
+        playerId = parseInt(playerId, 10);
+        console.log(`Добавляем игрока ${username} с ID ${playerId} в список; айди текущего игрока {{ player.user.id }}`);
+        // Находим контейнер со списком игроков
+        const playerList = document.querySelector('.player-list .row');
+        
+        if (!playerList) {
+            console.error('Не найден контейнер для списка игроков');
+            return;
+        }
+        
+        // Проверяем, существует ли уже игрок с таким ID
+        const existingPlayer = playerList.querySelector(`[data-player-user="${playerId}"]`)?.closest('.col-md-6');
+        if (existingPlayer) {
+            console.log(`Игрок с ID ${playerId} уже существует в списке`);
+            return; // Выходим из функции, если игрок уже в списке
+        }
+        
+        // Создаем HTML для нового игрока
+        const playerHtml = `
+        <div class="col-md-6 mb-3">
+            <div class="player-card" data-player-user="${playerId}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">${username}</h5>
+                    <span class="player-status-waiting">
+                        <i class="fas fa-clock"></i> Ожидание
+                    </span>
+                </div>
+                ${isRoomCreator ? `
+                <div class="mt-3 text-center">
+                    <button class="btn btn-sm btn-danger kick-player-btn" data-player-id="${playerId}">
+                        <i class="fas fa-user-times"></i> Исключить
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+        `;
+        
+        // Добавляем в контейнер
+        playerList.insertAdjacentHTML('beforeend', playerHtml);
+    }
+
+    function handleRoomStatus(data) {
+        showAlert('Игра началась! Обновление страницы...', 'success');
+        if (data.status === 'in_progress') {
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        }
+    }
+    
+    function setupEventHandlers() {
+        // Обработчик отправки сообщений в чат
+        const chatInput = document.getElementById('chat-input');
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        
+        if (chatInput && chatSendBtn) {
+            chatSendBtn.addEventListener('click', sendChatMessage);
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendChatMessage();
+                }
+            });
+        }
+        
+        // Обработчик кнопки готовности
+        const readyBtns = document.querySelectorAll('.set-ready-btn');
+        readyBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const playerId = this.dataset.playerId;
+                const ready = this.dataset.ready === 'true';
+                setPlayerReady(playerId, ready);
+            });
+        });
+        
+        // Обработчик кнопки исключения игрока
+        const kickBtns = document.querySelectorAll('.kick-player-btn');
+        kickBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const playerId = this.dataset.playerId;
+                kickPlayer(playerId);
+            });
+        });
+        
+        // Обработчик кнопки начала игры
+        const startGameBtn = document.getElementById('start-game-btn');
+        if (startGameBtn) {
+            startGameBtn.addEventListener('click', startGame);
+        }
+        
+        // Обработчики для игрового процесса
+        if ('{{ room.status }}' === 'in_progress') {
+            // Раскрытие атрибута
+            const revealBtns = document.querySelectorAll('.reveal-attribute-btn');
+            revealBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const playerId = this.dataset.playerId;
+                    const attribute = this.dataset.attribute;
+                    revealAttribute(playerId, attribute);
+                });
+            });
+            
+            // Голосование
+            const voteBtns = document.querySelectorAll('.vote-btn');
+            voteBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const sessionId = this.dataset.sessionId;
+                    const voterId = this.dataset.voterId;
+                    const targetId = this.dataset.targetId;
+                    votePlayer(sessionId, voterId, targetId);
+                });
+            });
+            
+            // Следующий игрок
+            const nextPlayerBtn = document.querySelector('.next-player-btn');
+            if (nextPlayerBtn) {
+                nextPlayerBtn.addEventListener('click', function() {
+                    const sessionId = this.dataset.sessionId;
+                    getNextPlayer(sessionId);
+                });
+            }
+            
+            // Использование карты
+            const useCardBtns = document.querySelectorAll('.use-card-btn');
+            useCardBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cardId = this.dataset.cardId;
+                    const playerId = this.dataset.playerId;
+                    const effectType = this.dataset.effectType;
+                    showUseCardModal(cardId, playerId, effectType);
+                });
+            });
+            
+            // Подтверждение использования карты
+            const confirmUseCardBtn = document.getElementById('confirmUseCard');
+            if (confirmUseCardBtn) {
+                confirmUseCardBtn.addEventListener('click', confirmUseCard);
+            }
+        }
+    }
+    
+    function sendChatMessage() {
+        const chatInput = document.getElementById('chat-input');
+        const message = chatInput.value.trim();
+        
+        if (message) {
+            socket.send(JSON.stringify({
+                type: 'chat_message',
+                message: message
+            }));
+            
+            chatInput.value = '';
+        }
+    }
+    
+    function addChatMessage(data) {
+        const chatContainer = document.getElementById('chat-container');
+        const isOwnMessage = data.user_id === `{{ request.user.id }}`;
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${isOwnMessage ? 'chat-message-own' : 'chat-message-other'}`;
+        
+        messageDiv.innerHTML = `
+            <span class="chat-username">${data.username}:</span>
+            <span class="chat-content">${data.message}</span>
+            <div class="chat-timestamp">${formatTimestamp(data.timestamp)}</div>
+        `;
+        
+        chatContainer.appendChild(messageDiv);
+        scrollChatToBottom();
+    }
+    
+    function scrollChatToBottom() {
+        const chatContainer = document.getElementById('chat-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+    
+    function formatTimestamp(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString();
+    }
+    
+    function setPlayerReady(playerId, ready) {
+        socket.send(JSON.stringify({
+            type: 'player_ready',
+            player_id: playerId,
+            ready: ready
+        }));
+    }
+    
+    function updatePlayerStatus(data) {
+        // Обновляем статус игрока в интерфейсе
+        const playerCards = document.querySelectorAll('.player-card');
+        
+        playerCards.forEach(card => {
+            const playerIdElements = card.querySelectorAll('[data-player-id]');
+            if (playerIdElements.length > 0) {
+                const playerIdElement = playerIdElements[0];
+                if (playerIdElement.dataset.playerId === data.player_id) {
+                    // Обновляем статус
+                    const statusElement = card.querySelector('.player-status-waiting, .player-status-ready');
+                    if (statusElement) {
+                        statusElement.className = `player-status-${data.status}`;
+                        statusElement.innerHTML = data.status === 'ready' ? 
+                            '<i class="fas fa-check-circle"></i> Готов' : 
+                            '<i class="fas fa-clock"></i> Ожидание';
+                    }
+                    
+                    // Обновляем кнопку готовности
+                    const readyBtn = card.querySelector('.set-ready-btn');
+                    if (readyBtn) {
+                        readyBtn.className = `btn btn-sm btn-${data.status === 'ready' ? 'warning' : 'success'} set-ready-btn`;
+                        readyBtn.dataset.ready = data.status === 'ready' ? 'false' : 'true';
+                        readyBtn.innerHTML = data.status === 'ready' ? 
+                            '<i class="fas fa-times-circle"></i> Отменить готовность' : 
+                            '<i class="fas fa-check-circle"></i> Готов к игре';
+                    }
+                    
+                    // Обновляем границу карточки
+                    if (data.status === 'ready') {
+                        card.classList.add('border-success');
+                    } else {
+                        card.classList.remove('border-success');
+                    }
+                }
+            }
+        });
+        
+        // Проверяем, все ли игроки готовы
+        const startGameBtn = document.getElementById('start-game-btn');
+        if (startGameBtn) {
+            const allReady = Array.from(document.querySelectorAll('.player-card')).every(card => {
+                return card.classList.contains('border-success');
+            });
+            
+            if (allReady && document.querySelectorAll('.player-card').length >= 6) {
+                startGameBtn.disabled = false;
+            }
+        }
+    }
+    
+    function kickPlayer(playerId) {
+        if (confirm('Вы уверены, что хотите исключить этого игрока?')) {
+            showLoading();
+            
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+            
+            fetch(`/room/{{ room.room_id }}/kick/${playerId}/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    showAlert('Игрок исключен из комнаты', 'success');
+                    // Обновляем страницу для отображения изменений
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.message || 'Не удалось исключить игрока', 'danger');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Произошла ошибка при исключении игрока', 'danger');
+                console.error('Error:', error);
+            });
+        }
+    }
+    
+    function startGame() {
+        if (confirm('Вы уверены, что хотите начать игру? Убедитесь, что все игроки готовы.')) {
+            showLoading();
+            
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+            
+            fetch('/room/{{ room.room_id }}/start/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+
+                    socket.send(JSON.stringify(
+                        {type: 'game_start'}
+                    ));
+
+                    showAlert('Игра успешно начата!', 'success');
+                    // Обновляем страницу для отображения игрового интерфейса
+                    // setTimeout(() => {
+                    //     window.location.reload();
+                    // }, 1000);
+                } else {
+                    showAlert(data.message || 'Не удалось начать игру', 'danger');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Произошла ошибка при запуске игры', 'danger');
+                console.error('Error:', error);
+            });
+        }
+    }
+    
+    function revealAttribute(playerId, attribute) {
+        socket.send(JSON.stringify({
+            type: 'reveal_attribute',
+            player_id: playerId,
+            attribute: attribute
+        }));
+    }
+    
+    function handleAttributeRevealed(data) {
+        showAlert(`Игрок ${data.username} раскрыл атрибут ${data.attribute}: ${data.value}`, 'info');
+        
+        // Обновляем интерфейс
+        // Добавляем атрибут в список открытых атрибутов игрока
+        const playerCards = document.querySelectorAll('.player-card');
+        playerCards.forEach(card => {
+            console.log(`CARD inner HTML:\n${card.innerHTML}`);
+            
+            const playerUserId = card.dataset.playerUser;
+            console.log(`PLAYER USER ID: ${playerUserId}`);
+
+            if (playerUserId === data.player_id) {
+                const attributesList = card.querySelector('.attribute-list');
+                if (attributesList) {
+                    const attributeItem = document.createElement('li');
+                    attributeItem.className = 'attribute-item';
+                    attributeItem.innerHTML = `<strong>${data.attribute}:</strong> ${data.value}`;
+                    attributesList.appendChild(attributeItem);
+                } else {
+                    const divs = card.querySelectorAll('div');
+                    const attributesContainer = Array.from(divs).find(div => {
+                        const h6 = div.querySelector('h6');
+                        return h6 && h6.textContent.includes('Открытые атрибуты:');
+                    });
+
+                    if (attributesContainer) {
+                        attributesContainer.innerHTML = `
+                            <h6>Открытые атрибуты:</h6>
+                            <ul class="attribute-list">
+                                <li class="attribute-item">
+                                    <strong>${data.attribute}:</strong> ${data.value}
+                                </li>
+                            </ul>
+                        `;
+                    }
+                }
+            }
+        });
+        
+        // Если это наш атрибут, обновляем его в нашей карточке персонажа
+        if (data.player_id == '{{ player.id }}') {
+            const attributeItems = document.querySelectorAll('.attribute-item');
+            attributeItems.forEach(item => {
+                if (item.querySelector('strong').textContent.toLowerCase().includes(data.attribute.toLowerCase())) {
+                    item.classList.remove('attribute-hidden');
+                    item.innerHTML += '<span class="badge bg-success ms-2">Открыто</span>';
+                }
+            });
+            
+            // Удаляем кнопку раскрытия этого атрибута
+            const revealBtns = document.querySelectorAll('.reveal-attribute-btn');
+            revealBtns.forEach(btn => {
+                if (btn.dataset.attribute === data.attribute) {
+                    btn.remove();
+                }
+            });
+        }
+        
+        // Обновляем события игры
+        addGameEvent({
+            type: 'reveal',
+            player: {
+                user: {
+                    username: data.username
+                }
+            },
+            data: {
+                attribute: data.attribute,
+                value: data.value
+            },
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    function votePlayer(sessionId, voterId, targetId) {
+        if (confirm('Вы уверены, что хотите проголосовать против этого игрока?')) {
+            socket.send(JSON.stringify({
+                type: 'vote',
+                session_id: sessionId,
+                voter_id: voterId,
+                target_id: targetId
+            }));
+        }
+    }
+    
+    function handleVoteCast(data) {
+        showAlert(`Игрок ${data.username} проголосовал против игрока`, 'info');
+        
+        // Обновляем события игры
+        addGameEvent({
+            type: 'vote',
+            player: {
+                user: {
+                    username: data.username
+                }
+            },
+            target_player: {
+                user: {
+                    username: document.querySelector(`[data-player-id="${data.target_id}"]`).closest('.player-card').querySelector('h5').textContent.trim()
+                }
+            },
+            timestamp: new Date().toISOString()
+        });
+        
+        // Если это наш голос, отключаем кнопки голосования
+        if (data.user_id === `{{ request.user.id }}`) {
+            const voteBtns = document.querySelectorAll('.vote-btn');
+            voteBtns.forEach(btn => {
+                btn.disabled = true;
+            });
+        }
+    }
+    
+    function handlePlayerEliminated(data) {
+        showAlert(`Игрок ${data.data.username} был исключен из бункера!`, 'danger');
+        
+        // Обновляем статус игрока в интерфейсе
+        const playerCards = document.querySelectorAll('.player-card');
+        playerCards.forEach(card => {
+            const playerIdElements = card.querySelectorAll('[data-player-id]');
+            if (playerIdElements.length > 0) {
+                const playerIdElement = playerIdElements[0];
+                if (playerIdElement.dataset.playerId === data.data.player_id) {
+                    // Обновляем статус
+                    card.classList.add('eliminated');
+                    const statusElement = card.querySelector('.player-status-playing');
+                    if (statusElement) {
+                        statusElement.className = 'player-status-eliminated';
+                        statusElement.innerHTML = '<i class="fas fa-user-slash"></i> Исключен';
+                    }
+                    
+                    // Удаляем кнопки взаимодействия
+                    const buttons = card.querySelectorAll('button');
+                    buttons.forEach(btn => btn.remove());
+                }
+            }
+        });
+        
+        // Обновляем события игры
+        addGameEvent({
+            type: 'elimination',
+            player: {
+                user: {
+                    username: data.data.username
+                }
+            },
+            data: {
+                votes: data.data.votes,
+                round: data.data.round
+            },
+            timestamp: new Date().toISOString()
+        });
+        
+        // Если игра завершена, перезагружаем страницу
+        if (data.message && data.message.includes('Игра завершена')) {
+            showAlert('Игра завершена! Перенаправление на страницу результатов...', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        }
+    }
+    
+    function handleNewRound(data) {
+        showAlert(`Начинается раунд ${data.data.round}!`, 'info');
+        
+        // Обновляем номер раунда в интерфейсе
+        const roundBadge = document.querySelector('.badge.bg-primary');
+        if (roundBadge) {
+            roundBadge.textContent = `Раунд ${data.data.round}`;
+        }
+        
+        // Обновляем направление хода
+        const directionBadge = document.querySelector('.badge.bg-info');
+        if (directionBadge) {
+            directionBadge.textContent = `Направление: ${data.data.clockwise ? 'По часовой' : 'Против часовой'}`;
+        }
+        
+        // Сбрасываем кнопки голосования
+        const voteBtns = document.querySelectorAll('.vote-btn');
+        voteBtns.forEach(btn => {
+            btn.disabled = false;
+        });
+    }
+    
+    function getNextPlayer(sessionId) {
+        socket.send(JSON.stringify({
+            type: 'next_player',
+            session_id: sessionId
+        }));
+    }
+    
+    function handleNextPlayer(data) {
+        showAlert(`Сейчас ходит: ${data.username}`, 'info');  
+        console.log(`Next player received: ${JSON.stringify(data)}`);
+        console.log(`PLAYER ID JINJA {{ player.id }}`);
+        console.log(`${data.player_id == '{{ player.id }}'}  IS DATA ID EQUAL TO PLAYER ID`);
+        
+        // Обновляем индикатор текущего игрока
+        const playerCards = document.querySelectorAll('.player-card');
+        playerCards.forEach(card => {
+            // Удаляем индикатор у всех игроков
+            const indicator = card.querySelector('.current-player-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+            
+            // Удаляем класс active у всех карточек
+            card.classList.remove('active');
+            
+            // Добавляем индикатор текущему игроку
+            const playerIdElements = card.querySelectorAll('[data-player-id]');
+            if (playerIdElements.length > 0) {
+                const playerIdElement = playerIdElements[0];
+                console.log("dataset player id === data player id");
+                console.log(playerIdElement.dataset.playerId === data.player_id);
+                if (playerIdElement.dataset.playerId === data.player_id) {
+                    card.classList.add('active');
+                    const playerName = card.querySelector('h5');
+                    console.log("player name");
+                    console.log(playerName);
+                    if (playerName) {
+                        playerName.innerHTML = `${data.username} <i class="fas fa-arrow-right text-primary current-player-indicator"></i>`;
+                    }
+                }
+            }
+        });
+        
+        // Обновляем информацию о текущем ходе
+        const currentPlayerAlert = document.querySelector('.alert.alert-primary');
+        if (currentPlayerAlert) {
+            currentPlayerAlert.innerHTML = `
+                <h5>Сейчас ходит: ${data.username}</h5>
+                ${data.player_id == '{{ player.id }}' ? 
+                '<p>Это ваш ход! Выберите один из своих атрибутов, чтобы раскрыть его другим игрокам.</p>' : 
+                '<p>Дождитесь, пока игрок раскроет один из своих атрибутов.</p>'}
+            `;
+        }
+        
+        // Показываем/скрываем элементы управления для текущего игрока
+        // const attributeSelection = document.querySelector('h5:contains("Выберите атрибут для раскрытия")');
+        const attributeSelection = Array.from(document.querySelectorAll('h5'))
+            .find(el => el.textContent.includes("Выберите атрибут для раскрытия"));
+        console.log("ATRIBUTE SELECTION")
+        console.log(attributeSelection)
+        if (attributeSelection) {
+            if (data.player_id == '{{ player.id }}') {
+                attributeSelection.parentElement.style.display = 'block';
+            } else {
+                attributeSelection.parentElement.style.display = 'none';
+            }
+        }
+    }
+    
+    function showUseCardModal(cardId, playerId, effectType) {
+        // Заполняем скрытые поля
+        document.getElementById('card_id').value = cardId;
+        document.getElementById('player_id').value = playerId;
+        
+        // Настраиваем отображение полей в зависимости от типа эффекта
+        const targetPlayerContainer = document.getElementById('targetPlayerContainer');
+        const attributeContainer = document.getElementById('attributeContainer');
+        const newValueContainer = document.getElementById('newValueContainer');
+        
+        // По умолчанию скрываем все контейнеры
+        targetPlayerContainer.style.display = 'none';
+        attributeContainer.style.display = 'none';
+        newValueContainer.style.display = 'none';
+        
+        // Настраиваем отображение в зависимости от типа эффекта
+        switch(effectType) {
+            case 'change_attribute':
+                targetPlayerContainer.style.display = 'block';
+                attributeContainer.style.display = 'block';
+                newValueContainer.style.display = 'block';
+                break;
+            case 'swap_attribute':
+                targetPlayerContainer.style.display = 'block';
+                attributeContainer.style.display = 'block';
+                break;
+            case 'reveal_attribute':
+                targetPlayerContainer.style.display = 'block';
+                attributeContainer.style.display = 'block';
+                break;
+            case 'add_bunker_capacity':
+            case 'reduce_supplies':
+            case 'increase_supplies':
+            case 'immunity':
+            case 'extra_vote':
+            case 'veto':
+                // Для этих типов не нужны дополнительные поля
+                break;
+            default:
+                targetPlayerContainer.style.display = 'block';
+                break;
+        }
+        
+        // Показываем модальное окно
+        const modal = new bootstrap.Modal(document.getElementById('useCardModal'));
+        modal.show();
+    }
+    
+    function confirmUseCard() {
+        const cardId = document.getElementById('card_id').value;
+        const playerId = document.getElementById('player_id').value;
+        const targetId = document.getElementById('target_id').value;
+        const attribute = document.getElementById('attribute').value;
+        const newValue = document.getElementById('new_value').value;
+        
+        // Формируем дополнительные данные
+        const additionalData = {};
+        if (attribute) {
+            additionalData.attribute = attribute;
+        }
+        if (newValue) {
+            additionalData.new_value = newValue;
+        }
+        
+        // Отправляем запрос на использование карты
+        socket.send(JSON.stringify({
+            type: 'use_card',
+            card_id: cardId,
+            player_id: playerId,
+            target_id: targetId,
+            additional_data: additionalData
+        }));
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('useCardModal'));
+        modal.hide();
+    }
+    
+    function handleCardUsed(data) {
+        if (data.success) {
+            showAlert(`Карта успешно использована: ${data.message}`, 'success');
+            
+            // Обновляем статус карты в интерфейсе
+            const actionCards = document.querySelectorAll('.action-card');
+            actionCards.forEach(card => {
+                if (card.dataset.cardId === data.card_id) {
+                    card.classList.add('used');
+                    const useBtn = card.querySelector('.use-card-btn');
+                    if (useBtn) {
+                        useBtn.remove();
+                    }
+                    card.innerHTML += '<span class="badge bg-secondary">Использована</span>';
+                }
+            });
+            
+            // Обновляем события игры
+            addGameEvent({
+                type: 'action_card',
+                player: {
+                    user: {
+                        username: data.username
+                    }
+                },
+                data: {
+                    card_name: document.querySelector(`[data-card-id="${data.card_id}"]`).querySelector('h6').textContent
+                },
+                timestamp: new Date().toISOString()
+            });
+            
+            // Если эффект карты изменил игровое состояние, перезагружаем страницу
+            if (data.effect_data && (
+                data.effect_data.type === 'add_bunker_capacity' || 
+                data.effect_data.type === 'reduce_supplies' || 
+                data.effect_data.type === 'increase_supplies' ||
+                data.effect_data.type === 'veto'
+            )) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+        } else {
+            showAlert(`Ошибка при использовании карты: ${data.message}`, 'danger');
+        }
+    }
+    
+    function addGameEvent(event) {
+        const eventsContainer = document.querySelector('.game-events');
+        if (!eventsContainer) return;
+        
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'event-item';
+        
+        let eventContent = '';
+        
+        switch(event.type) {
+            case 'game_start':
+                eventContent = `<strong>Игра началась!</strong> Катастрофа: ${event.data.catastrophe}`;
+                break;
+            case 'reveal':
+                eventContent = `<strong>${event.player.user.username}</strong> раскрыл атрибут <strong>${event.data.attribute}</strong>: ${event.data.value}`;
+                break;
+            case 'vote':
+                eventContent = `<strong>${event.player.user.username}</strong> проголосовал против <strong>${event.target_player.user.username}</strong>`;
+                break;
+            case 'elimination':
+                eventContent = `<strong>${event.player.user.username}</strong> был исключен из бункера (${event.data.votes} голосов)`;
+                break;
+            case 'action_card':
+                eventContent = `<strong>${event.player.user.username}</strong> использовал карту <strong>${event.data.card_name}</strong>`;
+                break;
+            case 'game_end':
+                eventContent = `<strong>Игра завершена!</strong> ${event.data.result}`;
+                break;
+        }
+        
+        eventDiv.innerHTML = `
+            ${eventContent}
+            <div class="event-timestamp">${formatTimestamp(event.timestamp)}</div>
+        `;
+        
+        eventsContainer.insertBefore(eventDiv, eventsContainer.firstChild);
+    }
+</script>
+{% endblock %}

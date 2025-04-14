@@ -1,0 +1,40 @@
+{% extends 'game/base.html' %}
+
+{% block title %}Бункер - Создание игры{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="text-center mb-0">Создание новой игры</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'create_game' %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Название комнаты</label>
+                        <input type="text" class="form-control" id="name" name="name" placeholder="Введите название комнаты" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="max_players" class="form-label">Максимальное количество игроков</label>
+                        <select class="form-select" id="max_players" name="max_players" required>
+                            {% for i in "6789012" %}
+                            <option value="{{ forloop.counter|add:5 }}" {% if forloop.counter|add:5 == 12 %}selected{% endif %}>{{ forloop.counter|add:5 }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Минимальное количество игроков для начала игры - 6.</div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">Создать игру</button>
+                        <a href="{% url 'index' %}" class="btn btn-secondary btn-lg ms-2">Отмена</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

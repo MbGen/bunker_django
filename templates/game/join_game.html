@@ -1,0 +1,37 @@
+{% extends 'game/base.html' %}
+
+{% block title %}Бункер - Присоединиться к игре{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h2 class="text-center mb-0">Присоединиться к игре</h2>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+                {% endif %}
+                
+                <form method="post" action="{% url 'join_game' %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="room_id" class="form-label">ID комнаты</label>
+                        <input type="text" class="form-control" id="room_id" name="room_id" placeholder="Введите ID комнаты" required>
+                        <div class="form-text">Введите ID комнаты, который вам предоставил создатель игры.</div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-success btn-lg">Присоединиться</button>
+                        <a href="{% url 'index' %}" class="btn btn-secondary btn-lg ms-2">Отмена</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

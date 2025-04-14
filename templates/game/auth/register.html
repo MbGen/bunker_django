@@ -1,0 +1,59 @@
+{% extends 'game/base.html' %}
+
+{% block title %}Бункер - Регистрация{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h2 class="text-center mb-0">Регистрация</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'register' %}">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger">
+                        <p>Пожалуйста, исправьте следующие ошибки:</p>
+                        {{ form.errors }}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">Имя пользователя</label>
+                        {{ form.username }}
+                        <div class="form-text">{{ form.username.help_text }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                        {{ form.email }}
+                        <div class="form-text">{{ form.email.help_text }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.password1.id_for_label }}" class="form-label">Пароль</label>
+                        {{ form.password1 }}
+                        <div class="form-text">{{ form.password1.help_text }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.password2.id_for_label }}" class="form-label">Подтверждение пароля</label>
+                        {{ form.password2 }}
+                        <div class="form-text">{{ form.password2.help_text }}</div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-success btn-lg">Зарегистрироваться</button>
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <p>Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

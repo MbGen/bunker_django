@@ -1,0 +1,154 @@
+{% extends 'game/base.html' %}
+
+{% block title %}Бункер - Результаты игры{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h2 class="text-center mb-0">Результаты игры</h2>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-{% if result == 'success' %}success{% else %}danger{% endif %} text-center mb-4">
+                    <h3>
+                        {% if result == 'success' %}
+                        Выжившие успешно заселились в бункер!
+                        {% else %}
+                        Катастрофа оказалась фатальной для всех!
+                        {% endif %}
+                    </h3>
+                    <p>{{ session.result_description }}</p>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h4 class="mb-0">Выжившие ({{ survivors|length }})</h4>
+                            </div>
+                            <div class="card-body">
+                                {% if survivors %}
+                                <div class="row">
+                                    {% for player in survivors %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="player-card border-success">
+                                            <h5>{{ player.user.username }}</h5>
+                                            <ul class="attribute-list">
+                                                {% if player.age %}
+                                                <li class="attribute-item"><strong>Возраст:</strong> {{ player.age }}</li>
+                                                {% endif %}
+                                                {% if player.gender %}
+                                                <li class="attribute-item"><strong>Пол:</strong> {{ player.gender }}</li>
+                                                {% endif %}
+                                                {% if player.profession %}
+                                                <li class="attribute-item"><strong>Профессия:</strong> {{ player.profession.value }}</li>
+                                                {% endif %}
+                                                {% if player.health %}
+                                                <li class="attribute-item"><strong>Здоровье:</strong> {{ player.health.value }}</li>
+                                                {% endif %}
+                                                {% if player.baggage %}
+                                                <li class="attribute-item"><strong>Багаж:</strong> {{ player.baggage.value }}</li>
+                                                {% endif %}
+                                                {% if player.phobia %}
+                                                <li class="attribute-item"><strong>Фобия:</strong> {{ player.phobia.value }}</li>
+                                                {% endif %}
+                                                {% if player.fact1 %}
+                                                <li class="attribute-item"><strong>Факт 1:</strong> {{ player.fact1.value }}</li>
+                                                {% endif %}
+                                                {% if player.fact2 %}
+                                                <li class="attribute-item"><strong>Факт 2:</strong> {{ player.fact2.value }}</li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-center text-muted">Никто не выжил</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card mb-4">
+                            <div class="card-header bg-danger text-white">
+                                <h4 class="mb-0">Исключенные ({{ eliminated|length }})</h4>
+                            </div>
+                            <div class="card-body">
+                                {% if eliminated %}
+                                <div class="row">
+                                    {% for player in eliminated %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="player-card border-danger">
+                                            <h5>{{ player.user.username }}</h5>
+                                            <ul class="attribute-list">
+                                                {% if player.age %}
+                                                <li class="attribute-item"><strong>Возраст:</strong> {{ player.age }}</li>
+                                                {% endif %}
+                                                {% if player.gender %}
+                                                <li class="attribute-item"><strong>Пол:</strong> {{ player.gender }}</li>
+                                                {% endif %}
+                                                {% if player.profession %}
+                                                <li class="attribute-item"><strong>Профессия:</strong> {{ player.profession.value }}</li>
+                                                {% endif %}
+                                                {% if player.health %}
+                                                <li class="attribute-item"><strong>Здоровье:</strong> {{ player.health.value }}</li>
+                                                {% endif %}
+                                                {% if player.baggage %}
+                                                <li class="attribute-item"><strong>Багаж:</strong> {{ player.baggage.value }}</li>
+                                                {% endif %}
+                                                {% if player.phobia %}
+                                                <li class="attribute-item"><strong>Фобия:</strong> {{ player.phobia.value }}</li>
+                                                {% endif %}
+                                                {% if player.fact1 %}
+                                                <li class="attribute-item"><strong>Факт 1:</strong> {{ player.fact1.value }}</li>
+                                                {% endif %}
+                                                {% if player.fact2 %}
+                                                <li class="attribute-item"><strong>Факт 2:</strong> {{ player.fact2.value }}</li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <p class="text-center text-muted">Никто не был исключен</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">Информация о катастрофе</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>{{ room.catastrophe.name }}</h5>
+                                <p>{{ room.catastrophe.description }}</p>
+                                <p><strong>Причина:</strong> {{ room.catastrophe.cause }}</p>
+                                <p><strong>Продолжительность:</strong> {{ room.catastrophe.duration_months }} месяцев</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Информация о бункере</h5>
+                                <p><strong>Размер:</strong> {{ room.bunker_size }}</p>
+                                <p><strong>Запасы:</strong> {{ room.bunker_supplies }}</p>
+                                <p><strong>Вместимость:</strong> {{ room.bunker_capacity }} человек</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <a href="{% url 'index' %}" class="btn btn-primary btn-lg me-2">На главную</a>
+                    <a href="{% url 'create_game' %}" class="btn btn-success btn-lg">Создать новую игру</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
