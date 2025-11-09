@@ -8,29 +8,53 @@
         max-height: 400px;
         overflow-y: auto;
     }
+
     .player-status-ready {
         color: #28a745;
     }
+
     .player-status-waiting {
         color: #ffc107;
     }
+
     .player-status-playing {
         color: #007bff;
     }
+
     .player-status-eliminated {
         color: #dc3545;
     }
+
     .player-status-survived {
         color: #28a745;
     }
+
     .current-player-indicator {
         animation: pulse 1.5s infinite;
     }
+
     @keyframes pulse {
         0% { opacity: 0.5; }
         50% { opacity: 1; }
         100% { opacity: 0.5; }
     }
+
+    .action-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background: #f8f9fa;
+    }
+
+    .attributes-section {
+        transition: opacity 0.3s ease;
+    }
+
+    .attributes-section.hidden {
+        display: none;
+    }
+
 </style>
 {% endblock %}
 
@@ -77,18 +101,18 @@
                             {% if p.user == request.user %}
                             <div class="mt-3 text-center">
                                 {% if p.status == 'ready' %}
-                                <button class="btn btn-sm btn-warning set-ready-btn" data-player-id="{{ p.id }}" data-ready="false">
+                                <button class="btn btn-sm btn-warning set-ready-btn" data-player-id="{{ p.user.id }}" data-ready="false">
                                     <i class="fas fa-times-circle"></i> Отменить готовность
                                 </button>
                                 {% else %}
-                                <button class="btn btn-sm btn-success set-ready-btn" data-player-id="{{ p.id }}" data-ready="true">
+                                <button class="btn btn-sm btn-success set-ready-btn" data-player-id="{{ p.user.id }}" data-ready="true">
                                     <i class="fas fa-check-circle"></i> Готов к игре
                                 </button>
                                 {% endif %}
                             </div>
                             {% elif is_creator %}
                             <div class="mt-3 text-center">
-                                <button class="btn btn-sm btn-danger kick-player-btn" data-player-id="{{ p.id }}">
+                                <button class="btn btn-sm btn-danger kick-player-btn" data-player-id="{{ p.user.id }}">
                                     <i class="fas fa-user-times"></i> Исключить
                                 </button>
                             </div>
@@ -282,42 +306,49 @@
                     </div>
                     
                     <div class="col-md-6">
-                        {% if game_data.is_my_turn and player.status == 'playing' %}
-                        <h5>Выберите атрибут для раскрытия</h5>
-                        <div class="list-group mb-4">
-                            {% for attr, value in game_data.character_attributes.items %}
-                            {% if attr not in player.revealed_attributes %}
-                            <button class="list-group-item list-group-item-action reveal-attribute-btn" data-player-id="{{ player.id }}" data-attribute="{{ attr }}">
-                                <strong>{{ attr|title }}:</strong> {{ value }}
-                            </button>
-                            {% endif %}
-                            {% endfor %}
-                        </div>
-                        
-                        <div class="text-center mb-4">
-                            <button class="btn btn-warning next-player-btn" data-session-id="{{ game_data.session.id }}">
-                                <i class="fas fa-forward"></i> Следующий игрок
-                            </button>
-                        </div>
-                        {% endif %}
-                        
-                        <h5>Ваши карты действий</h5>
-                        <div class="action-cards">
-                            {% for card in game_data.action_cards %}
-                            <div class="action-card {% if card.used %}used{% endif %}" data-card-id="{{ card.id }}">
-                                <h6>{{ card.card.name }}</h6>
-                                <p>{{ card.card.description }}</p>
-                                {% if not card.used %}
-                                <button class="btn btn-sm btn-primary use-card-btn" data-card-id="{{ card.id }}" data-player-id="{{ player.id }}" data-effect-type="{{ card.card.effect_type }}">
-                                    <i class="fas fa-magic"></i> Использовать
+                        <!-- Секция атрибутов - ОТДЕЛЬНО, скрывается если не ваш ход -->
+                        <div class="attributes-section" id="attributesSection">
+                            {% if game_data.is_my_turn and player.status == 'playing' %}
+                            <h5>Выберите атрибут для раскрытия</h5>
+                            <div class="list-group mb-4">
+                                {% for attr, value in game_data.character_attributes.items %}
+                                {% if attr not in player.revealed_attributes %}
+                                <button class="list-group-item list-group-item-action reveal-attribute-btn" data-player-id="{{ player.user.id }}" data-attribute="{{ attr }}">
+                                    <strong>{{ attr|title }}:</strong> {{ value }}
                                 </button>
-                                {% else %}
-                                <span class="badge bg-secondary">Использована</span>
                                 {% endif %}
+                                {% endfor %}
                             </div>
-                            {% endfor %}
+                            
+                            <div class="text-center mb-4">
+                                <button class="btn btn-warning next-player-btn" data-session-id="{{ game_data.session.id }}">
+                                    <i class="fas fa-forward"></i> Следующий игрок
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Секция карт действий - ВСЕГДА ВИДНА -->
+                        <div class="action-cards-section">
+                            <h5>Ваши карты действий</h5>
+                            <div class="action-cards">
+                                {% for card in game_data.action_cards %}
+                                <div class="action-card {% if card.used %}used{% endif %}" data-card-id="{{ card.id }}">
+                                    <h6>{{ card.card.name }}</h6>
+                                    <p>{{ card.card.description }}</p>
+                                    {% if not card.used %}
+                                    <button class="btn btn-sm btn-primary use-card-btn" data-card-id="{{ card.id }}" data-player-id="{{ player.user.id }}" data-effect-type="{{ card.card.effect_type }}">
+                                        <i class="fas fa-magic"></i> Использовать
+                                    </button>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Использована</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -473,6 +504,7 @@
     }
     
     function handleWebSocketMessage(data) {
+        console.log("Получено сообщение WebSocket:", data);
         switch(data.type) {
             case 'user_connect':
                 showAlert(`Игрок ${data.username} подключился к комнате`, 'info');
@@ -520,6 +552,7 @@
     }
 
     function addPlayerToList(username, playerId, isRoomCreator = false) {
+        console.log("addPlayerToList called with:", username, playerId, isRoomCreator);
         playerId = parseInt(playerId, 10);
         console.log(`Добавляем игрока ${username} с ID ${playerId} в список; айди текущего игрока {{ player.user.id }}`);
         // Находим контейнер со списком игроков
@@ -557,6 +590,8 @@
             </div>
         </div>
         `;
+
+        console.log("Создан HTML для нового игрока:", playerHtml);
         
         // Добавляем в контейнер
         playerList.insertAdjacentHTML('beforeend', playerHtml);
@@ -677,8 +712,9 @@
     
     function addChatMessage(data) {
         const chatContainer = document.getElementById('chat-container');
-        const isOwnMessage = data.user_id === `{{ request.user.id }}`;
+        const isOwnMessage = data.user_id == `{{ request.user.id }}`;
         
+        console.log("Добавление сообщения в чат:", data, "isOwnMessage:", isOwnMessage, " REQEUST USER ID {{ request.user.id }}");
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${isOwnMessage ? 'chat-message-own' : 'chat-message-other'}`;
         
@@ -708,7 +744,8 @@
         socket.send(JSON.stringify({
             type: 'player_ready',
             player_id: playerId,
-            ready: ready
+            ready: ready,
+            room_id: '{{ room.room_id }}'
         }));
     }
     
@@ -717,40 +754,43 @@
         const playerCards = document.querySelectorAll('.player-card');
         
         playerCards.forEach(card => {
-            const playerIdElements = card.querySelectorAll('[data-player-id]');
-            if (playerIdElements.length > 0) {
-                const playerIdElement = playerIdElements[0];
-                if (playerIdElement.dataset.playerId === data.player_id) {
-                    // Обновляем статус
-                    const statusElement = card.querySelector('.player-status-waiting, .player-status-ready');
-                    if (statusElement) {
-                        statusElement.className = `player-status-${data.status}`;
-                        statusElement.innerHTML = data.status === 'ready' ? 
-                            '<i class="fas fa-check-circle"></i> Готов' : 
-                            '<i class="fas fa-clock"></i> Ожидание';
-                    }
-                    
-                    // Обновляем кнопку готовности
-                    const readyBtn = card.querySelector('.set-ready-btn');
-                    if (readyBtn) {
-                        readyBtn.className = `btn btn-sm btn-${data.status === 'ready' ? 'warning' : 'success'} set-ready-btn`;
-                        readyBtn.dataset.ready = data.status === 'ready' ? 'false' : 'true';
-                        readyBtn.innerHTML = data.status === 'ready' ? 
-                            '<i class="fas fa-times-circle"></i> Отменить готовность' : 
-                            '<i class="fas fa-check-circle"></i> Готов к игре';
-                    }
-                    
-                    // Обновляем границу карточки
-                    if (data.status === 'ready') {
-                        card.classList.add('border-success');
-                    } else {
-                        card.classList.remove('border-success');
-                    }
+            // Проверяем оба варианта: data-player-id (для хоста) и data-player-user (для клиентов)
+            const playerIdFromHost = card.querySelector('[data-player-id]')?.dataset.playerId;
+            const playerIdFromClient = card.dataset.playerUser;
+            
+            const currentPlayerId = playerIdFromHost || playerIdFromClient;
+            
+            // Если ID совпадает с ID игрока из data
+            if (currentPlayerId == data.player_id) {
+                // Обновляем статус
+                const statusElement = card.querySelector('.player-status-waiting, .player-status-ready');
+                if (statusElement) {
+                    statusElement.className = `player-status-${data.status}`;
+                    statusElement.innerHTML = data.status === 'ready' ? 
+                        '<i class="fas fa-check-circle"></i> Готов' : 
+                        '<i class="fas fa-clock"></i> Ожидание';
+                }
+                
+                // Обновляем кнопку готовности (только для хоста, у клиентов её нет)
+                const readyBtn = card.querySelector('.set-ready-btn');
+                if (readyBtn) {
+                    readyBtn.className = `btn btn-sm btn-${data.status === 'ready' ? 'warning' : 'success'} set-ready-btn`;
+                    readyBtn.dataset.ready = data.status === 'ready' ? 'false' : 'true';
+                    readyBtn.innerHTML = data.status === 'ready' ? 
+                        '<i class="fas fa-times-circle"></i> Отменить готовность' : 
+                        '<i class="fas fa-check-circle"></i> Готов к игре';
+                }
+                
+                // Обновляем границу карточки
+                if (data.status === 'ready') {
+                    card.classList.add('border-success');
+                } else {
+                    card.classList.remove('border-success');
                 }
             }
         });
         
-        // Проверяем, все ли игроки готовы
+        // Проверяем, все ли игроки готовы (только для хоста)
         const startGameBtn = document.getElementById('start-game-btn');
         if (startGameBtn) {
             const allReady = Array.from(document.querySelectorAll('.player-card')).every(card => {
@@ -842,7 +882,8 @@
         socket.send(JSON.stringify({
             type: 'reveal_attribute',
             player_id: playerId,
-            attribute: attribute
+            attribute: attribute,
+            room_id: '{{ room.room_id }}'
         }));
     }
     
@@ -853,27 +894,40 @@
         // Добавляем атрибут в список открытых атрибутов игрока
         const playerCards = document.querySelectorAll('.player-card');
         playerCards.forEach(card => {
-            console.log(`CARD inner HTML:\n${card.innerHTML}`);
-            
             const playerUserId = card.dataset.playerUser;
-            console.log(`PLAYER USER ID: ${playerUserId}`);
-
-            if (playerUserId === data.player_id) {
-                const attributesList = card.querySelector('.attribute-list');
+            console.log(`PLAYER USER ID IN HANDLE REVEALED FOREACH: ${playerUserId}`);
+            if (playerUserId == data.player_id) {
+                let attributesList = card.querySelector('.attribute-list');
+                
                 if (attributesList) {
+                    // Список уже существует - просто добавляем новый элемент
                     const attributeItem = document.createElement('li');
                     attributeItem.className = 'attribute-item';
                     attributeItem.innerHTML = `<strong>${data.attribute}:</strong> ${data.value}`;
                     attributesList.appendChild(attributeItem);
                 } else {
+                    // Список не существует - создаем контейнер и список
                     const divs = card.querySelectorAll('div');
                     const attributesContainer = Array.from(divs).find(div => {
                         const h6 = div.querySelector('h6');
                         return h6 && h6.textContent.includes('Открытые атрибуты:');
                     });
-
+                    
                     if (attributesContainer) {
-                        attributesContainer.innerHTML = `
+                        // Контейнер существует, но нет списка - создаем список
+                        const ul = document.createElement('ul');
+                        ul.className = 'attribute-list';
+                        
+                        const attributeItem = document.createElement('li');
+                        attributeItem.className = 'attribute-item';
+                        attributeItem.innerHTML = `<strong>${data.attribute}:</strong> ${data.value}`;
+                        
+                        ul.appendChild(attributeItem);
+                        attributesContainer.appendChild(ul);
+                    } else {
+                        // Контейнера вообще нет - создаем всё с нуля
+                        const newContainer = document.createElement('div');
+                        newContainer.innerHTML = `
                             <h6>Открытые атрибуты:</h6>
                             <ul class="attribute-list">
                                 <li class="attribute-item">
@@ -881,18 +935,23 @@
                                 </li>
                             </ul>
                         `;
+                        card.appendChild(newContainer);
                     }
                 }
             }
         });
         
         // Если это наш атрибут, обновляем его в нашей карточке персонажа
-        if (data.player_id == '{{ player.id }}') {
+        if (data.player_id == '{{ player.user.id }}') {
             const attributeItems = document.querySelectorAll('.attribute-item');
             attributeItems.forEach(item => {
-                if (item.querySelector('strong').textContent.toLowerCase().includes(data.attribute.toLowerCase())) {
+                const strongTag = item.querySelector('strong');
+                if (strongTag && strongTag.textContent.toLowerCase().includes(data.attribute.toLowerCase())) {
                     item.classList.remove('attribute-hidden');
-                    item.innerHTML += '<span class="badge bg-success ms-2">Открыто</span>';
+                    // Проверяем, нет ли уже бейджа, чтобы не дублировать
+                    if (!item.querySelector('.badge')) {
+                        item.innerHTML += '<span class="badge bg-success ms-2">Открыто</span>';
+                    }
                 }
             });
             
@@ -1037,39 +1096,27 @@
             session_id: sessionId
         }));
     }
-    
+
     function handleNextPlayer(data) {
         showAlert(`Сейчас ходит: ${data.username}`, 'info');  
         console.log(`Next player received: ${JSON.stringify(data)}`);
-        console.log(`PLAYER ID JINJA {{ player.id }}`);
-        console.log(`${data.player_id == '{{ player.id }}'}  IS DATA ID EQUAL TO PLAYER ID`);
         
         // Обновляем индикатор текущего игрока
         const playerCards = document.querySelectorAll('.player-card');
         playerCards.forEach(card => {
-            // Удаляем индикатор у всех игроков
             const indicator = card.querySelector('.current-player-indicator');
             if (indicator) {
                 indicator.remove();
             }
             
-            // Удаляем класс active у всех карточек
             card.classList.remove('active');
             
-            // Добавляем индикатор текущему игроку
-            const playerIdElements = card.querySelectorAll('[data-player-id]');
-            if (playerIdElements.length > 0) {
-                const playerIdElement = playerIdElements[0];
-                console.log("dataset player id === data player id");
-                console.log(playerIdElement.dataset.playerId === data.player_id);
-                if (playerIdElement.dataset.playerId === data.player_id) {
-                    card.classList.add('active');
-                    const playerName = card.querySelector('h5');
-                    console.log("player name");
-                    console.log(playerName);
-                    if (playerName) {
-                        playerName.innerHTML = `${data.username} <i class="fas fa-arrow-right text-primary current-player-indicator"></i>`;
-                    }
+            const playerIdElement = card.getAttribute('data-player-user');
+            if (playerIdElement && playerIdElement == data.player_id) {
+                card.classList.add('active');
+                const playerName = card.querySelector('h5');
+                if (playerName) {
+                    playerName.innerHTML = `${data.username} <i class="fas fa-arrow-right text-primary current-player-indicator"></i>`;
                 }
             }
         });
@@ -1079,26 +1126,23 @@
         if (currentPlayerAlert) {
             currentPlayerAlert.innerHTML = `
                 <h5>Сейчас ходит: ${data.username}</h5>
-                ${data.player_id == '{{ player.id }}' ? 
+                ${data.player_id == '{{ player.user.id }}' ? 
                 '<p>Это ваш ход! Выберите один из своих атрибутов, чтобы раскрыть его другим игрокам.</p>' : 
                 '<p>Дождитесь, пока игрок раскроет один из своих атрибутов.</p>'}
             `;
         }
         
-        // Показываем/скрываем элементы управления для текущего игрока
-        // const attributeSelection = document.querySelector('h5:contains("Выберите атрибут для раскрытия")');
-        const attributeSelection = Array.from(document.querySelectorAll('h5'))
-            .find(el => el.textContent.includes("Выберите атрибут для раскрытия"));
-        console.log("ATRIBUTE SELECTION")
-        console.log(attributeSelection)
-        if (attributeSelection) {
-            if (data.player_id == '{{ player.id }}') {
-                attributeSelection.parentElement.style.display = 'block';
+        // Показываем/скрываем ТОЛЬКО секцию атрибутов по ID
+        const attributesSection = document.getElementById('attributesSection');
+        if (attributesSection) {
+            if (data.player_id == '{{ player.user.id }}') {
+                attributesSection.classList.remove('hidden');
             } else {
-                attributeSelection.parentElement.style.display = 'none';
+                attributesSection.classList.add('hidden');
             }
         }
     }
+    
     
     function showUseCardModal(cardId, playerId, effectType) {
         // Заполняем скрытые поля

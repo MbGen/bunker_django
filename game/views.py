@@ -159,7 +159,7 @@ def game_room(request, room_id):
         }
     
     # Получаем сообщения чата
-    chat_messages = ChatMessage.objects.filter(room=room).order_by('-timestamp')[:50]
+    chat_messages = ChatMessage.objects.filter(room=room).order_by('timestamp')[:50]
     
     context = {
         'room': room,
@@ -170,7 +170,7 @@ def game_room(request, room_id):
         'chat_messages': chat_messages
     }
     from pprint import pprint 
-    pprint(context)
+    pprint(f"CONTEXT: {context}")
     return render(request, 'game/game_room.html', context)
 
 @login_required

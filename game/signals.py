@@ -66,7 +66,7 @@ def broadcast_player_update(sender, instance, created, **kwargs):
             room_group_name,
             {
                 'type': 'player_status',
-                'player_id': instance.id,
+                'player_id': instance.user_id,
                 'status': instance.status,
                 'user_id': instance.user.id,
                 'username': instance.user.username

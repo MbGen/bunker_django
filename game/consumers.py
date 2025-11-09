@@ -12,7 +12,11 @@ class GameConsumer(AsyncWebsocketConsumer):
         self.room_id = self.scope['url_route']['kwargs']['room_id']
         self.room_group_name = f'game_{self.room_id}'
         self.user = self.scope['user']
-        
+        print("WE IN CONNECT METHOD")
+        print("TYPE USER", type(self.user), self.user)
+        print("ROOM ID", self.room_id, "GROUP NAME", self.room_group_name)
+        print("USER ID", self.user.id, "USERNAME", self.user.username)
+
         # Проверяем, есть ли пользователь в комнате
         if not await self.is_user_in_room():
             await self.close()
@@ -87,34 +91,38 @@ class GameConsumer(AsyncWebsocketConsumer):
         
         if not message:
             return
-        
+
         # Сохраняем сообщение в базе данных
         chat_message = await self.save_chat_message(message)
-        
+
+        # TODO: закмоентив бо дура на signals шле ше раз 
         # Отправляем сообщение всем в группе
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message,
-                'user_id': self.user.id,
-                'username': self.user.username,
-                'timestamp': chat_message.timestamp.isoformat()
-            }
-        )
+        # await self.channel_layer.group_send(
+        #     self.room_group_name,
+        #     {
+        #         'type': 'chat_message',
+        #         'message': message,
+        #         'user_id': self.user.id,
+        #         'username': self.user.username,
+        #         'timestamp': chat_message.timestamp.isoformat()
+        #     }
+        # )
     
     async def handle_player_ready(self, data):
         """Обработка статуса готовности игрока"""
         player_id = data.get('player_id')
         ready = data.get('ready', True)
-        
+        room_id = data.get('room_id')
+        print("HANDLE PLAYER READY", player_id, ready, data) 
+
         # Проверяем, принадлежит ли игрок текущему пользователю
-        if not await self.is_player_owner(player_id):
+        if not await self.is_player_owner(player_id, room_id):
             return
         
         # Обновляем статус готовности
-        success, message = await self.update_player_ready(player_id, ready)
-        
+        success, message = await self.update_player_ready(player_id, room_id, ready)
+        print("HANDLE PLAYER READY RESULT", success, message, "IS PLAYER OWNER?", await self.is_player_owner(player_id, room_id)) 
+
         if success:
             # Отправляем обновление всем в группе
             await self.channel_layer.group_send(
@@ -132,13 +140,14 @@ class GameConsumer(AsyncWebsocketConsumer):
         """Обработка раскрытия атрибута"""
         player_id = data.get('player_id')
         attribute = data.get('attribute')
+        room_id = data.get('room_id')
         
         # Проверяем, принадлежит ли игрок текущему пользователю
-        if not await self.is_player_owner(player_id):
+        if not await self.is_player_owner(player_id, room_id):
             return
         
         # Раскрываем атрибут
-        success, message, value = await self.reveal_player_attribute(player_id, attribute)
+        success, message, value = await self.reveal_player_attribute(player_id, room_id, attribute)
         
         if success:
             # Отправляем обновление всем в группе
@@ -159,7 +168,8 @@ class GameConsumer(AsyncWebsocketConsumer):
         session_id = data.get('session_id')
         voter_id = data.get('voter_id')
         target_id = data.get('target_id')
-        
+        print("HANDLE VOTE", session_id, voter_id, target_id) 
+
         # Проверяем, принадлежит ли голосующий текущему пользователю
         if not await self.is_player_owner(voter_id):
             return
@@ -309,10 +319,10 @@ class GameConsumer(AsyncWebsocketConsumer):
             return False
     
     @database_sync_to_async
-    def is_player_owner(self, player_id):
+    def is_player_owner(self, player_id, room_id):
         """Проверяет, принадлежит ли игрок текущему пользователю"""
         try:
-            return Player.objects.filter(id=player_id, user=self.user).exists()
+            return Player.objects.filter(user_id=player_id, user=self.user, room__room_id=room_id).exists()
         except:
             return False
     
@@ -327,21 +337,21 @@ class GameConsumer(AsyncWebsocketConsumer):
         )
     
     @database_sync_to_async
-    def update_player_ready(self, player_id, ready):
+    def update_player_ready(self, player_id, room_id, ready):
         """Обновляет статус готовности игрока"""
         from .services import GameService
-        return GameService.set_player_ready(player_id, ready)
+        return GameService.set_player_ready(player_id, room_id, ready)
     
     @database_sync_to_async
-    def reveal_player_attribute(self, player_id, attribute):
+    def reveal_player_attribute(self, player_id, room_id, attribute):
         """Раскрывает атрибут игрока"""
         from .services import GameService
-        success, message = GameService.reveal_attribute(player_id, attribute)
+        success, message = GameService.reveal_attribute(player_id, room_id, attribute)
         
         # Получаем значение атрибута
         value = None
         if success:
-            player = Player.objects.get(id=player_id)
+            player = Player.objects.get(user_id=player_id, room__room_id=room_id)
             if attribute == 'age':
                 value = player.age
             elif attribute == 'gender':
@@ -419,7 +429,7 @@ class GameConsumer(AsyncWebsocketConsumer):
         from .services import GameService
         player, message =  GameService.get_next_player(session_id)
         return {
-            'id': player.id,
+            'id': player.user_id,
             'username': player.user.username,
             'message': message
         }, message

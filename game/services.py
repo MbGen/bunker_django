@@ -58,10 +58,10 @@ class GameService:
             return None, "Комната не найдена"
     
     @staticmethod
-    def set_player_ready(player_id, ready=True):
+    def set_player_ready(player_id, room_id, ready=True):
         """Устанавливает статус готовности игрока"""
         try:
-            player = Player.objects.get(id=player_id)
+            player = Player.objects.get(user__id=player_id, room__room_id=room_id)
             player.status = 'ready' if ready else 'waiting'
             player.save()
             return True, "Статус готовности обновлен"
@@ -353,10 +353,10 @@ class GameService:
         return cards
     
     @staticmethod
-    def reveal_attribute(player_id, attribute_name):
+    def reveal_attribute(player_id, room_id, attribute_name):
         """Открывает атрибут игрока для всех"""
         try:
-            player = Player.objects.get(id=player_id)
+            player = Player.objects.get(user_id=player_id, room__room_id=room_id)
             
             # Проверяем, не открыт ли уже атрибут
             if attribute_name in player.revealed_attributes:
